@@ -52,7 +52,7 @@ services:
       REPMGR_NODE_NETWORK_NAME: pg-primary
       REPMGR_PARTNER_NODES: pg-primary,pg-replica-1,pg-replica-2
     volumes:
-      - pg0_data:/bitnami/postgresql
+      - /store/new-age/data/kc-pg-data-r0:/bitnami/postgresql
     networks: [keycloak-net]
     deploy:
       placement:
@@ -77,7 +77,7 @@ services:
       REPMGR_PASSWORD: ${REPMGR_PASSWORD}
       REPMGR_PARTNER_NODES: pg-primary,pg-replica-1,pg-replica-2
     volumes:
-      - pg1_data:/bitnami/postgresql
+      - /store/new-age/data/kc-pg-data-r1:/bitnami/postgresql
     networks: [keycloak-net]
     deploy:
       restart_policy:
@@ -99,7 +99,7 @@ services:
       REPMGR_PASSWORD: ${REPMGR_PASSWORD}
       REPMGR_PARTNER_NODES: pg-primary,pg-replica-1,pg-replica-2
     volumes:
-      - pg2_data:/bitnami/postgresql
+      - /store/new-age/data/kc-pg-data-r2:/bitnami/postgresql
     networks: [keycloak-net]
     deploy:
       restart_policy:
