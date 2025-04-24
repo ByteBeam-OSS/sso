@@ -1,0 +1,106 @@
+version: "3.9"
+
+networks:
+  keycloak-net:
+    driver: overlay
+
+volumes:
+  pg0_data:
+  pg1_data:
+  pg2_data:
+
+services:
+  # ---------- IDENTITY PROVIDER ----------
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.2.1   # latest as of 2025-04-24
+    command: >
+      start --optimized
+             --cache=ispn                        # recommended default
+             --hostname-strict=false
+    environment:
+      KC_DB: postgres
+      KC_DB_URL_HOST: pg-primary                # the service name below
+      KC_DB_URL_PORT: 5432
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: ${KC_DB_PASSWORD}         # 🔑  secret
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN}         # 🔑  secret
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}  # 🔑
+    deploy:
+      replicas: 1                               # scale horizontally if you like
+      placement:
+        constraints:
+          - node.role == worker
+      restart_policy:
+        condition: on-failure
+    networks: [keycloak-net]
+    depends_on: [pg-primary]
+
+  # ---------- POSTGRESQL HA CLUSTER ----------
+  # Primary ------------------------------------------------------------
+  pg-primary:
+    image: bitnami/postgresql-repmgr:17
+    environment:
+      POSTGRESQL_POSTGRES_PASSWORD: ${PG_SUPERUSER_PASSWORD}   # 🔑
+      POSTGRESQL_USERNAME: keycloak
+      POSTGRESQL_PASSWORD: ${KC_DB_PASSWORD}                   # same as above
+      POSTGRESQL_DATABASE: keycloak
+      #
+      # repmgr config
+      REPMGR_PASSWORD: ${REPMGR_PASSWORD}                      # 🔑
+      REPMGR_PRIMARY_HOST: pg-primary
+      REPMGR_NODE_NAME: pg-primary
+      REPMGR_NODE_NETWORK_NAME: pg-primary
+      REPMGR_PARTNER_NODES: pg-primary,pg-replica-1,pg-replica-2
+    volumes:
+      - pg0_data:/bitnami/postgresql
+    networks: [keycloak-net]
+    deploy:
+      placement:
+        constraints:
+          - node.role == manager        # keep leader on a manager if you wish
+      restart_policy:
+        condition: on-failure
+
+  # Replica-1 ----------------------------------------------------------
+  pg-replica-1:
+    image: bitnami/postgresql-repmgr:17
+    environment:
+      POSTGRESQL_POSTGRES_PASSWORD: ${PG_SUPERUSER_PASSWORD}
+      POSTGRESQL_USERNAME: keycloak
+      POSTGRESQL_PASSWORD: ${KC_DB_PASSWORD}
+      POSTGRESQL_DATABASE: keycloak
+      #
+      POSTGRESQL_REPLICATION_MODE: slave
+      REPMGR_PRIMARY_HOST: pg-primary
+      REPMGR_NODE_NAME: pg-replica-1
+      REPMGR_NODE_NETWORK_NAME: pg-replica-1
+      REPMGR_PASSWORD: ${REPMGR_PASSWORD}
+      REPMGR_PARTNER_NODES: pg-primary,pg-replica-1,pg-replica-2
+    volumes:
+      - pg1_data:/bitnami/postgresql
+    networks: [keycloak-net]
+    deploy:
+      restart_policy:
+        condition: on-failure
+
+  # Replica-2 ----------------------------------------------------------
+  pg-replica-2:
+    image: bitnami/postgresql-repmgr:17
+    environment:
+      POSTGRESQL_POSTGRES_PASSWORD: ${PG_SUPERUSER_PASSWORD}
+      POSTGRESQL_USERNAME: keycloak
+      POSTGRESQL_PASSWORD: ${KC_DB_PASSWORD}
+      POSTGRESQL_DATABASE: keycloak
+      #
+      POSTGRESQL_REPLICATION_MODE: slave
+      REPMGR_PRIMARY_HOST: pg-primary
+      REPMGR_NODE_NAME: pg-replica-2
+      REPMGR_NODE_NETWORK_NAME: pg-replica-2
+      REPMGR_PASSWORD: ${REPMGR_PASSWORD}
+      REPMGR_PARTNER_NODES: pg-primary,pg-replica-1,pg-replica-2
+    volumes:
+      - pg2_data:/bitnami/postgresql
+    networks: [keycloak-net]
+    deploy:
+      restart_policy:
+        condition: on-failure
