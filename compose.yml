@@ -57,7 +57,7 @@ services:
     deploy:
       placement:
         constraints:
-          - node.role == manager        # keep leader on a manager if you wish
+          - node.labels.server_id == lnd1
       restart_policy:
         condition: on-failure
 
@@ -82,6 +82,9 @@ services:
     deploy:
       restart_policy:
         condition: on-failure
+      placement:
+        constraints:
+          - node.labels.server_id == nyc3
 
   # Replica-2 ----------------------------------------------------------
   pg-replica-2:
@@ -104,3 +107,6 @@ services:
     deploy:
       restart_policy:
         condition: on-failure
+      placement:
+        constraints:
+          - node.labels.server_id == amd1
